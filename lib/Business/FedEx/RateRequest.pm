@@ -27,7 +27,24 @@ our @EXPORT_OK = ( @{ $EXPORT_TAGS{'all'} } );
 
 our @EXPORT = qw();
 
-our $VERSION = '0.91';
+our $VERSION = '0.92';
+
+# FedEx Shipping notes
+our %ship_note;
+$ship_note{'FEDEX SAMEDAY'} = 'Fastest\t Delivery time based on flight availability';
+$ship_note{'FIRST_OVERNIGHT'} = 'Overnight\t 	Delivery by 8:00 or 8:30 am';										
+$ship_note{'PRIORITY_OVERNIGHT'} = 'Overnight\t Delivery by10:30 am';
+$ship_note{'STANDARD_OVERNIGHT'} = 'Overnight\n Delivery by 3:00 pm';															
+$ship_note{'FEDEX_2_DAY'} = '2 Business Days\t Delivery by 4:30 pm';
+$ship_note{'FEDEX_EXPRESS_SAVER'} = '3 Business Days\t 	Delivery by 4:30 pm';	
+$ship_note{'FEDEX_GROUND'} = '1–5 Business Days\t	Delivery day based on distance to destination';	
+$ship_note{'FEDEX_HOME_DELIVERY'} = '1–5 Business Days\t Delivery day based on distance to destination';				
+
+$ship_note{'INTERNATIONAL_NEXT_FLIGHT'} = 'Fastest\t Delivery time based on flight availability';
+$ship_note{'INTERNATIONAL_FIRST'}   = '2 Business Days\t Delivery by 8:00 or 8:30 am to select European cities';
+$ship_note{'INTERNATIONAL_PRIORITY'}= '1–3 Business Days\t Delivery time based on country';
+$ship_note{'INTERNATIONAL_ECONOMY'} = '2–5 Business Days\t Delivery time based on country';
+$ship_note{'INTERNATIONAL_GROUND'}	= '3–7 Business Days\t Delivery to Canada and Puerto Rico';
 
 
 # Preloaded methods go here.
@@ -60,7 +77,6 @@ sub new {
 # - - - - - - - - - - - - - - -
 sub get_rates
 {
-
 	my $self = shift @_;
 	my %args = @_;
 
@@ -110,25 +126,32 @@ sub get_rates
 	{
    	my $ah_ref = $detail_ref->{'v9:RatedShipmentDetails'};
 
-      my $Amount; 
+      my $ship_cost; 
       if ( ref($ah_ref) eq 'ARRAY' ) 
       {
-			$Amount = $ah_ref->[0]->{'v9:ShipmentRateDetail'}->{'v9:TotalNetCharge'}->{'v9:Amount'};
+			$ship_cost = $ah_ref->[0]->{'v9:ShipmentRateDetail'}->{'v9:TotalNetCharge'}->{'v9:ship_cost'};
       }
       else
 		{
-			$Amount = $ah_ref->{'v9:ShipmentRateDetail'}->{'v9:TotalNetCharge'}->{'v9:Amount'};
+			$ship_cost = $ah_ref->{'v9:ShipmentRateDetail'}->{'v9:TotalNetCharge'}->{'v9:ship_cost'};
 		}
 
   		my $ServiceType = $detail_ref->{'v9:ServiceType'};
 
-      $rtn_lst[$i] = { 'ServiceType'=>$ServiceType, 'Amount'=>$Amount };   
+      # Tags
+  		my $tag = lc($ServiceType);
+      $tag =~ s/_/ /g;
+      $tag =~ s/\b(\w)/\U$1/g;
+
+		# Notes
+      my $note = $ship_note{"$ServiceType"};
+
+      $rtn_lst[$i] = {'ServiceType'=>$ServiceType, 'ship_cost'=>$ship_cost, 'ship_tag'=>$tag, 'ship_note'=>$note};
       $i++;  
    }
    
    return wantarray ? @rtn_lst : \@rtn_lst;
  }
- 
 
 # - - - - - - - - - - - - - - -
 sub gen_xml
@@ -254,27 +277,27 @@ Should return something like
 
 	$VAR1 = [
           {
-            'Amount' => '112.93',
+            'ship_cost' => '112.93',
             'ServiceType' => 'FIRST_OVERNIGHT'
           },
           {
-            'Amount' => '48.91',
+            'ship_cost' => '48.91',
             'ServiceType' => 'PRIORITY_OVERNIGHT'
           },
           {
-            'Amount' => '75.04',
+            'ship_cost' => '75.04',
             'ServiceType' => 'STANDARD_OVERNIGHT'
           },
           {
-            'Amount' => '42.84',
+            'ship_cost' => '42.84',
             'ServiceType' => 'FEDEX_2_DAY'
           },
           {
-            'Amount' => '28.81',
+            'ship_cost' => '28.81',
             'ServiceType' => 'FEDEX_EXPRESS_SAVER'
           },
           {
-            'Amount' => '7.74',
+            'ship_cost' => '7.74',
             'ServiceType' => 'FEDEX_GROUND'
           }
         ];
@@ -291,7 +314,7 @@ while to develop the XML request but it returns results faster than the PHP Soap
 The XML returned is voluminous, over 30k bytes to return a few rates, but is smaller 
 than the comparable Soap results.
 
-The URI's are not either published but I as successful in using  
+The URI's are not published anywhere I could find but I was successful in using  
 
 Test:		https://gatewaybeta.fedex.com:443/xml/rate 
 Production:	https://gateway.fedex.com:443/xml
@@ -299,6 +322,8 @@ Production:	https://gateway.fedex.com:443/xml
 Early Beta modules and notes may be available at:  
 
 http://perlworks.com/cpan
+
+If you use this module and have comments or suggestions please let me know.  
 
 =head1 METHODS
 
@@ -310,11 +335,11 @@ The new method is the constructor.
 
 The input hash must include the following:
 
-   uri     	  
-   account    
-   meter   	  
-	key        
-   password   
+   uri 		=> FedEx URI (test or production)      	  
+   account 	=> FedEx Account    
+   meter 	=> FedEx Meter Number     	  
+	key 		=> FedEx Key        
+   password => FedEx Password   
 
 =item $obj->get_rates(%hash)
 
@@ -335,6 +360,8 @@ However the following are optionally and can override the defaults as noted
    unless ( $args{'height'}       ) { $args{'height'} = '5' } 
 
 =item $obj->err_msg()
+
+=back
 
 Returns last posted error message. Usually checked after a 
 false return from one of the methods above. 

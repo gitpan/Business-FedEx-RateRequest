@@ -4,3 +4,7 @@ Revision history for Perl extension Business::FedEx::RateRequest.
 	- original version; created by h2xs 1.23 with options
 		-X -n Business::FedEx::RateRequest
 
+0.92 Sat Oct 30
+
+Added Tags and Notes. Attempted to align ServiceTypes with notes. I could not exercise
+each of these ServiceTypes so there may be missing notes.  

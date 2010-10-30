@@ -1,6 +1,6 @@
 --- #YAML:1.0
 name:               Business-FedEx-RateRequest
-version:            0.91
+version:            0.92
 abstract:           Perl extension for getting available rates from Fedex using their Web Services API. 
 author:
     - root <root@localdomain>
