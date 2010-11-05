@@ -27,7 +27,7 @@ our @EXPORT_OK = ( @{ $EXPORT_TAGS{'all'} } );
 
 our @EXPORT = qw();
 
-our $VERSION = '0.92';
+our $VERSION = '0.93';
 
 # FedEx Shipping notes
 our %ship_note;
@@ -338,7 +338,7 @@ The input hash must include the following:
    uri 		=> FedEx URI (test or production)      	  
    account 	=> FedEx Account    
    meter 	=> FedEx Meter Number     	  
-	key 		=> FedEx Key        
+   key 		=> FedEx Key        
    password => FedEx Password   
 
 =item $obj->get_rates(%hash)
