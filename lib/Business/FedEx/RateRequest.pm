@@ -27,7 +27,7 @@ our @EXPORT_OK = ( @{ $EXPORT_TAGS{'all'} } );
 
 our @EXPORT = qw();
 
-our $VERSION = '0.93';
+our $VERSION = '0.94';
 
 # FedEx Shipping notes
 our %ship_note;
@@ -125,15 +125,15 @@ sub get_rates
 	foreach my $detail_ref ( @{$rate_lst_ref} )
 	{
    	my $ah_ref = $detail_ref->{'v9:RatedShipmentDetails'};
-
       my $ship_cost; 
+      
       if ( ref($ah_ref) eq 'ARRAY' ) 
       {
-			$ship_cost = $ah_ref->[0]->{'v9:ShipmentRateDetail'}->{'v9:TotalNetCharge'}->{'v9:ship_cost'};
+			$ship_cost = $ah_ref->[0]->{'v9:ShipmentRateDetail'}->{'v9:TotalNetCharge'}->{'v9:Amount'};
       }
       else
 		{
-			$ship_cost = $ah_ref->{'v9:ShipmentRateDetail'}->{'v9:TotalNetCharge'}->{'v9:ship_cost'};
+			$ship_cost = $ah_ref->{'v9:ShipmentRateDetail'}->{'v9:TotalNetCharge'}->{'v9:Amount'};
 		}
 
   		my $ServiceType = $detail_ref->{'v9:ServiceType'};

@@ -7,4 +7,8 @@ Revision history for Perl extension Business::FedEx::RateRequest.
 0.92 Sat Oct 30
 
 Added Tags and Notes. Attempted to align ServiceTypes with notes. I could not exercise
-each of these ServiceTypes so there may be missing notes.  
+each of these ServiceTypes so there may be missing notes. 
+
+0.94 Sat Nov 13 2010
+
+Fixed bug, a search and replace error that prevented the cost from being parsed.  
