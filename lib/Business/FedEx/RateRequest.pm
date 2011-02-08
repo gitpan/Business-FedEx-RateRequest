@@ -27,24 +27,24 @@ our @EXPORT_OK = ( @{ $EXPORT_TAGS{'all'} } );
 
 our @EXPORT = qw();
 
-our $VERSION = '0.94';
+our $VERSION = '0.95';
 
 # FedEx Shipping notes
 our %ship_note;
-$ship_note{'FEDEX SAMEDAY'} = 'Fastest\t Delivery time based on flight availability';
-$ship_note{'FIRST_OVERNIGHT'} = 'Overnight\t 	Delivery by 8:00 or 8:30 am';										
-$ship_note{'PRIORITY_OVERNIGHT'} = 'Overnight\t Delivery by10:30 am';
-$ship_note{'STANDARD_OVERNIGHT'} = 'Overnight\n Delivery by 3:00 pm';															
-$ship_note{'FEDEX_2_DAY'} = '2 Business Days\t Delivery by 4:30 pm';
-$ship_note{'FEDEX_EXPRESS_SAVER'} = '3 Business Days\t 	Delivery by 4:30 pm';	
-$ship_note{'FEDEX_GROUND'} = '1–5 Business Days\t	Delivery day based on distance to destination';	
-$ship_note{'FEDEX_HOME_DELIVERY'} = '1–5 Business Days\t Delivery day based on distance to destination';				
+$ship_note{'FEDEX SAMEDAY'} = 'Fastest Delivery time based on flight availability';
+$ship_note{'FIRST_OVERNIGHT'} = 'Overnight Delivery by 8:00 or 8:30 am';										
+$ship_note{'PRIORITY_OVERNIGHT'} = 'Overnight Delivery by 10:30 am';
+$ship_note{'STANDARD_OVERNIGHT'} = 'Overnight Delivery by 3:00 pm';															
+$ship_note{'FEDEX_2_DAY'} = '2 Business Days Delivery by 4:30 pm';
+$ship_note{'FEDEX_EXPRESS_SAVER'} = '3 Business Days Delivery by 4:30 pm';	
+$ship_note{'FEDEX_GROUND'} = '1-5 Business Days Delivery day based on distance to destination';	
+$ship_note{'FEDEX_HOME_DELIVERY'} = '1-5 Business Days Delivery day based on distance to destination';				
 
-$ship_note{'INTERNATIONAL_NEXT_FLIGHT'} = 'Fastest\t Delivery time based on flight availability';
-$ship_note{'INTERNATIONAL_FIRST'}   = '2 Business Days\t Delivery by 8:00 or 8:30 am to select European cities';
-$ship_note{'INTERNATIONAL_PRIORITY'}= '1–3 Business Days\t Delivery time based on country';
-$ship_note{'INTERNATIONAL_ECONOMY'} = '2–5 Business Days\t Delivery time based on country';
-$ship_note{'INTERNATIONAL_GROUND'}	= '3–7 Business Days\t Delivery to Canada and Puerto Rico';
+$ship_note{'INTERNATIONAL_NEXT_FLIGHT'} = 'Fastest Delivery time based on flight availability';
+$ship_note{'INTERNATIONAL_FIRST'}   = '2 Business Days Delivery by 8:00 or 8:30 am to select European cities';
+$ship_note{'INTERNATIONAL_PRIORITY'}= '1-3 Business Days Delivery time based on country';
+$ship_note{'INTERNATIONAL_ECONOMY'} = '2-5 Business Days Delivery time based on country';
+$ship_note{'INTERNATIONAL_GROUND'}	= '3-7 Business Days Delivery to Canada and Puerto Rico';
 
 
 # Preloaded methods go here.
@@ -69,6 +69,8 @@ sub new {
     foreach my $param (@rqd_lst) { unless ( $args{$param} ) { $self->{'err_msg'}="$param required"; return 0; } }
 
     $self->{UA} = LWP::UserAgent->new(agent => 'perlworks');
+    if ( $args{'timeout'} ) { $self->{UA}->timeout($args{'timeout'}); }
+        
     #$self->{REQ} = HTTP::Request->new(POST=>$self->{uri}); # Create a request
 
     bless ($self, $class);
@@ -86,32 +88,33 @@ sub get_rates
    unless ( $args{'src_country'}  ) { $args{'src_country'} = 'US' }  
    unless ( $args{'dst_country'}  ) { $args{'dst_country'} = 'US' } 
    unless ( $args{'weight_units'} ) { $args{'weight_units'} = 'LB'} 
-   unless ( $args{'size_units'}   ) { $args{'lnght_units'} = 'IN' } 
+   unless ( $args{'size_units'}   ) { $args{'size_units'} = 'IN' } 
    unless ( $args{'length'}       ) { $args{'length'} = '5' } 
    unless ( $args{'width'}        ) { $args{'width'}  = '5' } 
    unless ( $args{'height'}       ) { $args{'height'} = '5' } 
+   unless ( $args{'dropoff_type'} ) { $args{'dropoff_type'} = 'REGULAR_PICKUP' }
 
    my $xml_snd_doc = $self->gen_xml(\%args); 
 
-	#print $xml_snd_doc; exit; 
+   #print $xml_snd_doc; exit; 
 
-	my $response = $self->{UA}->post($self->{'uri'}, Content_Type=>'text/xml', Content=>$xml_snd_doc);
+   my $response = $self->{UA}->post($self->{'uri'}, Content_Type=>'text/xml', Content=>$xml_snd_doc);
 
-	unless ($response->is_success) 
-	{
-		$self->{'err_msg'} = "Error Request: " . $response->status_line;
+   unless ($response->is_success) 
+   {
+	  $self->{'err_msg'} = "Error Request: " . $response->status_line;
       return 0; 
    }
   
    # Must be success let's parse 
 
-	my $rtn = $response->as_string;
- 	$rtn =~ /(.*)\n\n(.*)/s;
+   my $rtn = $response->as_string;
+   $rtn =~ /(.*)\n\n(.*)/s;
    
-	my $hdr = $1;  # Don't use for anything right now
+   my $hdr = $1;  # Don't use for anything right now
    my $xml_rtn_doc = $2; # The object of this all.... 
 
-	my $xml_obj  = new XML::Simple;    
+   my $xml_obj  = new XML::Simple;    
 
    my $data = $xml_obj->XMLin($xml_rtn_doc); # Time consuming operation. could use a regexp to speed up if necessary. 
         
@@ -122,9 +125,9 @@ sub get_rates
    my @rtn_lst; # This will be returned
 
    my $i = 0; 
-	foreach my $detail_ref ( @{$rate_lst_ref} )
-	{
-   	my $ah_ref = $detail_ref->{'v9:RatedShipmentDetails'};
+   foreach my $detail_ref ( @{$rate_lst_ref} )
+   {
+      my $ah_ref = $detail_ref->{'v9:RatedShipmentDetails'};
       my $ship_cost; 
       
       if ( ref($ah_ref) eq 'ARRAY' ) 
@@ -132,18 +135,18 @@ sub get_rates
 			$ship_cost = $ah_ref->[0]->{'v9:ShipmentRateDetail'}->{'v9:TotalNetCharge'}->{'v9:Amount'};
       }
       else
-		{
-			$ship_cost = $ah_ref->{'v9:ShipmentRateDetail'}->{'v9:TotalNetCharge'}->{'v9:Amount'};
-		}
+	  {
+	        $ship_cost = $ah_ref->{'v9:ShipmentRateDetail'}->{'v9:TotalNetCharge'}->{'v9:Amount'};
+      }
 
-  		my $ServiceType = $detail_ref->{'v9:ServiceType'};
+  	  my $ServiceType = $detail_ref->{'v9:ServiceType'};
 
       # Tags
-  		my $tag = lc($ServiceType);
+      my $tag = lc($ServiceType);
       $tag =~ s/_/ /g;
       $tag =~ s/\b(\w)/\U$1/g;
 
-		# Notes
+	  # Notes
       my $note = $ship_note{"$ServiceType"};
 
       $rtn_lst[$i] = {'ServiceType'=>$ServiceType, 'ship_cost'=>$ship_cost, 'ship_tag'=>$tag, 'ship_note'=>$note};
@@ -183,7 +186,7 @@ sub gen_xml
   </Version>
   <RequestedShipment>
     <ShipTimestamp>2010-08-20T09:30:47-05:00</ShipTimestamp>
-    <DropoffType>REGULAR_PICKUP</DropoffType>
+    <DropoffType>$args->{'dropoff_type'}</DropoffType>
     <PackagingType>YOUR_PACKAGING</PackagingType>
     <Shipper>
       <AccountNumber>$self->{'account'}</AccountNumber>
@@ -211,14 +214,14 @@ sub gen_xml
     <RequestedPackageLineItems>
       <SequenceNumber>1</SequenceNumber>
       <Weight>
-        <Units>LB</Units>
+        <Units>$args->{'weight_units'}</Units>
         <Value>$args->{'weight'}</Value>
       </Weight>
       <Dimensions>
         <Length>$args->{'length'}</Length>
         <Width>$args->{'width'}</Width>
         <Height>$args->{'height'}</Height>
-        <Units>IN</Units>
+        <Units>$args->{'size_units'}</Units>
       </Dimensions>
     </RequestedPackageLineItems>
   </RequestedShipment>
@@ -354,10 +357,15 @@ However the following are optionally and can override the defaults as noted
    unless ( $args{'src_country'}  ) { $args{'src_country'} = 'US' }  
    unless ( $args{'dst_country'}  ) { $args{'dst_country'} = 'US' } 
    unless ( $args{'weight_units'} ) { $args{'weight_units'} = 'LB'} 
-   unless ( $args{'size_units'}   ) { $args{'lnght_units'} = 'IN' } 
+   unless ( $args{'size_units'}   ) { $args{'size_units'} = 'IN' } 
    unless ( $args{'length'}       ) { $args{'length'} = '5' } 
    unless ( $args{'width'}        ) { $args{'width'}  = '5' } 
    unless ( $args{'height'}       ) { $args{'height'} = '5' } 
+   unless ( $args{'dropoff_type'} ) { $args{'dropoff_type'} = 'REGULAR_PICKUP' }
+
+Valid weight_units values are LB, KG.
+Valid size_units are IN, CM.
+Valid dropoff_types are REGULAR_PICKUP, BUSINESS_SERVICE_CENTER, DROP_BOX, REQUEST_COURIER, STATION.
 
 =item $obj->err_msg()
 
@@ -379,6 +387,7 @@ off in 2012
 =head1 AUTHOR
 
 Steve Troxel, E<lt>troxel @ REMOVEMEperlworks.com E<gt>
+with contributions and bug fixes from Kyle Albritton. 
 
 =head1 COPYRIGHT AND LICENSE
 
