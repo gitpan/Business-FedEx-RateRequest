@@ -25,16 +25,19 @@ DEPENDENCIES
 
 This module requires these other modules and libraries:
 
-  blah blah blah
+ use LWP::UserAgent;
+ use XML::Simple; 
 
 COPYRIGHT AND LICENCE
 
-Put the correct copyright and licence information here.
-
-Copyright (C) 2010 by root
+Copyright (C) 2012 by Steve Troxel
 
 This library is free software; you can redistribute it and/or modify
 it under the same terms as Perl itself, either Perl version 5.8.8 or,
 at your option, any later version of Perl 5 you may have available.
 
+MISC
 
+If you use this software let me know if you have any suggested improvements. Also if
+i have your email I will send notification of a new release or found bug that may 
+effect your usage.

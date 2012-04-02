@@ -10,6 +10,8 @@ use LWP::UserAgent;
 use XML::Simple;
 use Data::Dumper; 
 
+ use Time::Piece;
+ 
 our @ISA = qw(Exporter);
 
 # Items to export into callers namespace by default. Note: do not export
@@ -27,7 +29,7 @@ our @EXPORT_OK = ( @{ $EXPORT_TAGS{'all'} } );
 
 our @EXPORT = qw();
 
-our $VERSION = '0.95';
+our $VERSION = '0.97';
 
 # FedEx Shipping notes
 our %ship_note;
@@ -45,7 +47,6 @@ $ship_note{'INTERNATIONAL_FIRST'}   = '2 Business Days Delivery by 8:00 or 8:30 
 $ship_note{'INTERNATIONAL_PRIORITY'}= '1-3 Business Days Delivery time based on country';
 $ship_note{'INTERNATIONAL_ECONOMY'} = '2-5 Business Days Delivery time based on country';
 $ship_note{'INTERNATIONAL_GROUND'}	= '3-7 Business Days Delivery to Canada and Puerto Rico';
-
 
 # Preloaded methods go here.
 
@@ -85,18 +86,23 @@ sub get_rates
    my @rqd_lst = qw/src_zip dst_zip weight/;    
    foreach my $param (@rqd_lst) { unless ( $args{$param} ) { $self->{'err_msg'}="$param required"; return 0; } }
 
-   unless ( $args{'src_country'}  ) { $args{'src_country'} = 'US' }  
-   unless ( $args{'dst_country'}  ) { $args{'dst_country'} = 'US' } 
-   unless ( $args{'weight_units'} ) { $args{'weight_units'} = 'LB'} 
-   unless ( $args{'size_units'}   ) { $args{'size_units'} = 'IN' } 
-   unless ( $args{'length'}       ) { $args{'length'} = '5' } 
-   unless ( $args{'width'}        ) { $args{'width'}  = '5' } 
-   unless ( $args{'height'}       ) { $args{'height'} = '5' } 
-   unless ( $args{'dropoff_type'} ) { $args{'dropoff_type'} = 'REGULAR_PICKUP' }
+   unless ( $args{'src_country'}    ) { $args{'src_country'} = 'US' }  
+   unless ( $args{'dst_country'}    ) { $args{'dst_country'} = 'US' } 
+   unless ( $args{'dst_residential'}) { $args{'dst_residential'} = 'false' } 
+   unless ( $args{'weight_units'}   ) { $args{'weight_units'} = 'LB'} 
+   unless ( $args{'size_units'}     ) { $args{'size_units'} = 'IN' } 
+   unless ( $args{'length'}         ) { $args{'length'} = '5' } 
+   unless ( $args{'width'}          ) { $args{'width'}  = '5' } 
+   unless ( $args{'height'}         ) { $args{'height'} = '5' } 
+   unless ( $args{'dropoff_type'}   ) { $args{'dropoff_type'} = 'REGULAR_PICKUP' }
+   unless ( $args{'insured_value'}  ) { $args{'insured_value'} = '0' }
+   
+   my $datetime = localtime;
+   $args{'timestamp'} = $datetime->datetime;
+      
+   my $xml_snd_doc = $self->gen_xml_v9(\%args); 
 
-   my $xml_snd_doc = $self->gen_xml(\%args); 
-
-   #print $xml_snd_doc; exit; 
+   #-#print $xml_snd_doc; exit; # debug line 
 
    my $response = $self->{UA}->post($self->{'uri'}, Content_Type=>'text/xml', Content=>$xml_snd_doc);
 
@@ -118,12 +124,21 @@ sub get_rates
 
    my $data = $xml_obj->XMLin($xml_rtn_doc); # Time consuming operation. could use a regexp to speed up if necessary. 
         
-   #print $response->as_string; exit; # Debug 
+   #-#print $response->as_string; exit; # Debug 
 
    my $rate_lst_ref = $data->{'v9:RateReplyDetails'};
      
    my @rtn_lst; # This will be returned
 
+   unless ( defined $rate_lst_ref ) 
+   { 
+       $self->{'err_msg'} = $data->{faultstring} || 'No rate data returned';
+       return 0;
+   } # Kyle's catch 
+
+   # If only one rate service 
+   if ( ref $rate_lst_ref eq 'HASH' ) { $rate_lst_ref = [ $rate_lst_ref ] }
+         
    my $i = 0; 
    foreach my $detail_ref ( @{$rate_lst_ref} )
    {
@@ -157,7 +172,146 @@ sub get_rates
  }
 
 # - - - - - - - - - - - - - - -
-sub gen_xml
+sub gen_xml_v10
+{
+   my $self = shift; 
+	my $args = shift;
+
+	my $rqst = <<END;
+<?xml version="1.0" encoding="utf-8"?>
+<v10:RateRequest xmlns:v10="http://fedex.com/ws/rate/v10">
+<v10:WebAuthenticationDetail>
+<v10:UserCredential>
+<v10:Key>$self->{'key'}</v10:Key>
+<v10:Password>$self->{'password'}</v10:Password>
+</v10:UserCredential>
+</v10:WebAuthenticationDetail>
+<v10:ClientDetail>
+<v10:AccountNumber>$self->{'account'}</v10:AccountNumber>
+<v10:MeterNumber>$self->{'meter'}</v10:MeterNumber>
+</v10:ClientDetail>
+<v10:TransactionDetail>
+<v10:CustomerTransactionId>Rate a Single Package V10</v10:CustomerTransactionId>
+</v10:TransactionDetail>
+<v10:Version>
+<v10:ServiceId>crs</v10:ServiceId>
+<v10:Major>10</v10:Major>
+<v10:Intermediate>0</v10:Intermediate>
+<v10:Minor>0</v10:Minor>
+</v10:Version>
+<v10:ReturnTransitAndCommit>1</v10:ReturnTransitAndCommit>
+<v10:CarrierCodes>FDXE</v10:CarrierCodes>
+<v10:RequestedShipment>
+<v10:ShipTimestamp>$self->{'timestamp'}</v10:ShipTimestamp>
+<v10:DropoffType>$args->{'dropoff_type'}</v10:DropoffType>
+<v10:PackagingType>YOUR_PACKAGING</v10:PackagingType>
+<v10:Shipper>
+<v10:AccountNumber>$self->{'account'}</v10:AccountNumber>
+<v10:Tins>
+<v10:TinType>PERSONAL_STATE</v10:TinType>
+<v10:Number>1057</v10:Number>
+<v10:Usage>ShipperTinsUsage</v10:Usage>
+</v10:Tins>
+<v10:Contact>
+<v10:ContactId>SY32030</v10:ContactId>
+<v10:PersonName>Sunil Yadav</v10:PersonName>
+<v10:CompanyName>Syntel Inc</v10:CompanyName>
+<v10:PhoneNumber>9545871684</v10:PhoneNumber>
+<v10:PhoneExtension>020</v10:PhoneExtension>
+<v10:EMailAddress>sunil_yadav3\@syntelinc.com</v10:EMailAddress>
+</v10:Contact>
+<v10:Address>
+<v10:StreetLines>SHIPPER ADDRESS LINE 1</v10:StreetLines>
+<v10:StreetLines>SHIPPER ADDRESS LINE 2</v10:StreetLines>
+<v10:City>COLORADO SPRINGS</v10:City>
+<v10:StateOrProvinceCode>CO</v10:StateOrProvinceCode>
+<v10:PostalCode>$args->{'src_zip'}</v10:PostalCode>
+<v10:UrbanizationCode>CO</v10:UrbanizationCode>
+<v10:CountryCode>$args->{'src_country'}</v10:CountryCode>
+<v10:Residential>0</v10:Residential>
+</v10:Address>
+</v10:Shipper>
+<v10:Recipient>
+<v10:Contact>
+<v10:PersonName>Receipient</v10:PersonName>
+<v10:CompanyName>Receiver Org</v10:CompanyName>
+<v10:PhoneNumber>9982145555</v10:PhoneNumber>
+<v10:PhoneExtension>011</v10:PhoneExtension>
+<v10:EMailAddress>receiver\@yahoo.com</v10:EMailAddress>
+</v10:Contact>
+<v10:Address>
+<v10:StreetLines>RECIPIENT ADDRESS LINE 1</v10:StreetLines>
+<v10:StreetLines>RECIPIENT ADDRESS LINE 2</v10:StreetLines>
+<v10:City>DENVER</v10:City>
+<v10:StateOrProvinceCode>CO</v10:StateOrProvinceCode>
+<v10:PostalCode>$args->{'dst_zip'}</v10:PostalCode>
+<v10:UrbanizationCode>CO</v10:UrbanizationCode>
+<v10:CountryCode>$args->{'dst_country'}</v10:CountryCode>
+<v10:Residential>0</v10:Residential>
+</v10:Address>
+</v10:Recipient>
+<v10:RecipientLocationNumber>DEN001</v10:RecipientLocationNumber>
+<v10:Origin>
+<v10:Contact>
+<v10:ContactId>SY32030</v10:ContactId>
+<v10:PersonName>Sunil Yadav</v10:PersonName>
+<v10:CompanyName>Syntel Inc</v10:CompanyName>
+<v10:PhoneNumber>9545871684</v10:PhoneNumber>
+<v10:PhoneExtension>020</v10:PhoneExtension>
+<v10:EMailAddress>sunil_yadav3\@syntelinc.com</v10:EMailAddress>
+</v10:Contact>
+<v10:Address>
+<v10:StreetLines>SHIPPER ADDRESS LINE 1</v10:StreetLines>
+<v10:StreetLines>SHIPPER ADDRESS LINE 2</v10:StreetLines>
+<v10:City>COLORADO SPRINGS</v10:City>
+<v10:StateOrProvinceCode>CO</v10:StateOrProvinceCode>
+<v10:PostalCode>80915</v10:PostalCode>
+<v10:UrbanizationCode>CO</v10:UrbanizationCode>
+<v10:CountryCode>US</v10:CountryCode>
+<v10:Residential>0</v10:Residential>
+</v10:Address>
+</v10:Origin>
+<v10:ShippingChargesPayment>
+<v10:PaymentType>SENDER</v10:PaymentType>
+<v10:Payor>
+<v10:AccountNumber></v10:AccountNumber>
+<v10:CountryCode>US</v10:CountryCode>
+</v10:Payor>
+</v10:ShippingChargesPayment>
+<v10:RateRequestTypes>ACCOUNT</v10:RateRequestTypes>
+<v10:PackageCount>1</v10:PackageCount>
+<v10:RequestedPackageLineItems>
+<v10:SequenceNumber>1</v10:SequenceNumber>
+<v10:GroupNumber>1</v10:GroupNumber>
+<v10:GroupPackageCount>1</v10:GroupPackageCount>
+<v10:Weight>
+<v10:Units>$args->{'weight_units'}</v10:Units>
+<v10:Value>$args->{'weight'}</v10:Value>
+</v10:Weight>
+<v10:Dimensions>
+<v10:Length>$args->{'length'}</v10:Length>
+<v10:Width>$args->{'width'}</v10:Width>
+<v10:Height>$args->{'height'}</v10:Height>
+<v10:Units>$args->{'size_units'}</v10:Units>
+</v10:Dimensions>
+<v10:PhysicalPackaging>BAG</v10:PhysicalPackaging>
+<v10:ContentRecords>
+<v10:PartNumber>PRTNMBR007</v10:PartNumber>
+<v10:ItemNumber>ITMNMBR007</v10:ItemNumber>
+<v10:ReceivedQuantity>10</v10:ReceivedQuantity>
+<v10:Description>ContentDescription</v10:Description>
+</v10:ContentRecords>
+</v10:RequestedPackageLineItems>
+</v10:RequestedShipment>
+</v10:RateRequest>    
+END
+
+  #$rqst =~ s/\n//g;
+  return $rqst;
+}
+
+# - - - - - - - - - - - - - - -
+sub gen_xml_v9
 {
    my $self = shift; 
 	my $args = shift;
@@ -185,9 +339,13 @@ sub gen_xml
     <Minor>0</Minor>
   </Version>
   <RequestedShipment>
-    <ShipTimestamp>2010-08-20T09:30:47-05:00</ShipTimestamp>
+    <ShipTimestamp>$args->{'timestamp'}</ShipTimestamp>
     <DropoffType>$args->{'dropoff_type'}</DropoffType>
     <PackagingType>YOUR_PACKAGING</PackagingType>
+    <TotalInsuredValue>
+        <Currency>USD</Currency>
+        <Amount>$args->{'insured_value'}</Amount>
+    </TotalInsuredValue>
     <Shipper>
       <AccountNumber>$self->{'account'}</AccountNumber>
       <Address>
@@ -199,6 +357,7 @@ sub gen_xml
       <Address>
         <PostalCode>$args->{'dst_zip'}</PostalCode>
         <CountryCode>$args->{'dst_country'}</CountryCode>
+        <Residential>$args->{'dst_residential'}</Residential>
       </Address>
     </Recipient>
     <ShippingChargesPayment>
@@ -270,7 +429,11 @@ Business::FedEx::RateRequest - Perl extension for getting available rates from F
 	$ship_args{'src_zip'} = '83835'; 
 	$ship_args{'dst_zip'} = '55411'; 
 	$ship_args{'weight'} = 5; 
-
+    
+    # Optional args
+	$ship_args{'dst_residential'} = 'true'; # defualt is commercial 
+	$ship_args{'insured_value'} = 50; 
+    
 	my $rtn = $Rate->get_rates(%ship_args);
 
 	if ( $rtn )	{ print Dumper $rtn }
@@ -352,17 +515,19 @@ The input must include the following
 	dst_zip => Source Zip Code
 	weight  => Package weight in lbs
 
-However the following are optionally and can override the defaults as noted
-
-   unless ( $args{'src_country'}  ) { $args{'src_country'} = 'US' }  
-   unless ( $args{'dst_country'}  ) { $args{'dst_country'} = 'US' } 
-   unless ( $args{'weight_units'} ) { $args{'weight_units'} = 'LB'} 
-   unless ( $args{'size_units'}   ) { $args{'size_units'} = 'IN' } 
-   unless ( $args{'length'}       ) { $args{'length'} = '5' } 
-   unless ( $args{'width'}        ) { $args{'width'}  = '5' } 
-   unless ( $args{'height'}       ) { $args{'height'} = '5' } 
-   unless ( $args{'dropoff_type'} ) { $args{'dropoff_type'} = 'REGULAR_PICKUP' }
-
+However the following are optionally and can be overrided. The defaults are as noted
+  
+   unless ( $args{'src_country'}    ){ $args{'src_country'} = 'US' }  
+   unless ( $args{'dst_country'}    ){ $args{'dst_country'} = 'US' } 
+   unless ( $args{'dst_residential'}){ $args{'dst_residential'} = 'false' } 
+   unless ( $args{'weight_units'}   ){ $args{'weight_units'} = 'LB'} 
+   unless ( $args{'size_units'}     ){ $args{'size_units'} = 'IN' } 
+   unless ( $args{'length'}         ){ $args{'length'} = '5' } 
+   unless ( $args{'width'}          ){ $args{'width'}  = '5' } 
+   unless ( $args{'height'}         ){ $args{'height'} = '5' } 
+   unless ( $args{'dropoff_type'}   ){ $args{'dropoff_type'} = ' PICKUP' }
+   unless ( $args{'insured_value'}  ){ $args{'insured_value'} = '0' }
+   
 Valid weight_units values are LB, KG.
 Valid size_units are IN, CM.
 Valid dropoff_types are REGULAR_PICKUP, BUSINESS_SERVICE_CENTER, DROP_BOX, REQUEST_COURIER, STATION.
@@ -383,6 +548,10 @@ None by default.
 Business::FedEx::DirectConnect may work but I could not find the URI to use with this 
 method and I found out that the Ship Manager API is depreciated and will be turned 
 off in 2012 
+
+=head1 DEPENDENCIES 
+
+LWP::UserAgent, XML::Simple;
 
 =head1 AUTHOR
 

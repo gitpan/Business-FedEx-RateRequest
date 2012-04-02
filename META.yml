@@ -1,23 +1,23 @@
---- #YAML:1.0
-name:               Business-FedEx-RateRequest
-version:            0.95
-abstract:           Perl extension for getting available rates from Fedex using their Web Services API. 
+---
+abstract: 'Perl extension for getting available rates from Fedex using their Web Services API. '
 author:
-    - root <root@localdomain>
-license:            unknown
-distribution_type:  module
-configure_requires:
-    ExtUtils::MakeMaker:  0
+  - 'troxel AT perlworks.com>'
 build_requires:
-    ExtUtils::MakeMaker:  0
-requires:
-    LWP::UserAgent:  0
-    XML::Simple:     0
-no_index:
-    directory:
-        - t
-        - inc
-generated_by:       ExtUtils::MakeMaker version 6.56
+  ExtUtils::MakeMaker: 0
+configure_requires:
+  ExtUtils::MakeMaker: 0
+dynamic_config: 1
+generated_by: 'ExtUtils::MakeMaker version 6.62, CPAN::Meta::Converter version 2.112150'
+license: unknown
 meta-spec:
-    url:      http://module-build.sourceforge.net/META-spec-v1.4.html
-    version:  1.4
+  url: http://module-build.sourceforge.net/META-spec-v1.4.html
+  version: 1.4
+name: Business-FedEx-RateRequest
+no_index:
+  directory:
+    - t
+    - inc
+requires:
+  LWP::UserAgent: 0
+  XML::Simple: 0
+version: 0.97
