@@ -19,5 +19,6 @@ no_index:
     - inc
 requires:
   LWP::UserAgent: 0
+  Time::Piece: 0
   XML::Simple: 0
-version: 0.97
+version: 0.98

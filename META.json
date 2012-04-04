@@ -33,10 +33,11 @@
       "runtime" : {
          "requires" : {
             "LWP::UserAgent" : 0,
+            "Time::Piece" : 0,
             "XML::Simple" : 0
          }
       }
    },
    "release_status" : "stable",
-   "version" : "0.97"
+   "version" : "0.98"
 }
