@@ -29,7 +29,7 @@ our @EXPORT_OK = ( @{ $EXPORT_TAGS{'all'} } );
 
 our @EXPORT = qw();
 
-our $VERSION = '0.98';
+our $VERSION = '1.00';
 
 # FedEx Shipping notes
 our %ship_note;
@@ -80,9 +80,14 @@ sub new {
 # - - - - - - - - - - - - - - -
 sub get_rates
 {
-	my $self = shift @_;
-	my %args = @_;
+   my $self = shift @_;
+   my %args = @_;
 
+   # As of Jan 2014 Fedex without warning changed the return xml document. The elements with versionized name spaces were changed to generic tags.
+   # so what was <v9:RateReplyDetails> is now <RateReplyDetails>  Sheessssh why would they change something like this.... 
+   
+   my $ver_prefix = '';  # Added a version namespace prefix in case they add it back in at a latter date.  
+   	
    my @rqd_lst = qw/src_zip dst_zip weight/;    
    foreach my $param (@rqd_lst) { unless ( $args{$param} ) { $self->{'err_msg'}="$param required"; return 0; } }
 
@@ -101,6 +106,7 @@ sub get_rates
    $args{'timestamp'} = $datetime->datetime;
       
    my $xml_snd_doc = $self->gen_xml_v9(\%args); 
+   #my $xml_snd_doc = $self->gen_xml_v10(\%args); 
 
    #-#print $xml_snd_doc; exit; # debug line 
 
@@ -124,9 +130,9 @@ sub get_rates
 
    my $data = $xml_obj->XMLin($xml_rtn_doc); # Time consuming operation. could use a regexp to speed up if necessary. 
         
-   #-#print $response->as_string; exit; # Debug 
+   #-#print $response->as_string; exit; # Debug line 
 
-   my $rate_lst_ref = $data->{'v9:RateReplyDetails'};
+   my $rate_lst_ref = $data->{"${ver_prefix}RateReplyDetails"};
      
    my @rtn_lst; # This will be returned
 
@@ -142,19 +148,19 @@ sub get_rates
    my $i = 0; 
    foreach my $detail_ref ( @{$rate_lst_ref} )
    {
-      my $ah_ref = $detail_ref->{'v9:RatedShipmentDetails'};
+      my $ah_ref = $detail_ref->{"${ver_prefix}RatedShipmentDetails"};
       my $ship_cost; 
       
       if ( ref($ah_ref) eq 'ARRAY' ) 
       {
-			$ship_cost = $ah_ref->[0]->{'v9:ShipmentRateDetail'}->{'v9:TotalNetCharge'}->{'v9:Amount'};
+			$ship_cost = $ah_ref->[0]->{"${ver_prefix}ShipmentRateDetail"}->{"${ver_prefix}TotalNetCharge"}->{"${ver_prefix}Amount"};
       }
       else
 	  {
-	        $ship_cost = $ah_ref->{'v9:ShipmentRateDetail'}->{'v9:TotalNetCharge'}->{'v9:Amount'};
+	        $ship_cost = $ah_ref->{"${ver_prefix}ShipmentRateDetail"}->{"${ver_prefix}TotalNetCharge"}->{"${ver_prefix}Amount"};
       }
 
-  	  my $ServiceType = $detail_ref->{'v9:ServiceType'};
+  	  my $ServiceType = $detail_ref->{"${ver_prefix}ServiceType"};
 
       # Tags
       my $tag = lc($ServiceType);
@@ -177,7 +183,7 @@ sub gen_xml_v10
    my $self = shift; 
 	my $args = shift;
 
-	my $rqst = <<END;
+	my $rqst = qq(
 <?xml version="1.0" encoding="utf-8"?>
 <v10:RateRequest xmlns:v10="http://fedex.com/ws/rate/v10">
 <v10:WebAuthenticationDetail>
@@ -202,7 +208,7 @@ sub gen_xml_v10
 <v10:ReturnTransitAndCommit>1</v10:ReturnTransitAndCommit>
 <v10:CarrierCodes>FDXE</v10:CarrierCodes>
 <v10:RequestedShipment>
-<v10:ShipTimestamp>$self->{'timestamp'}</v10:ShipTimestamp>
+<v10:ShipTimestamp>$args->{'timestamp'}</v10:ShipTimestamp>
 <v10:DropoffType>$args->{'dropoff_type'}</v10:DropoffType>
 <v10:PackagingType>YOUR_PACKAGING</v10:PackagingType>
 <v10:Shipper>
@@ -304,7 +310,7 @@ sub gen_xml_v10
 </v10:RequestedPackageLineItems>
 </v10:RequestedShipment>
 </v10:RateRequest>    
-END
+);
 
   #$rqst =~ s/\n//g;
   return $rqst;

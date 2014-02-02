@@ -1,6 +1,12 @@
 Revision history for Perl extension Business::FedEx::RateRequest.
 
 ______________________________________
+1.00 Sun Feb 02 2014
+
+* Fedex without warning changed the return xml document. The elements with versionized name spaces were changed to generic tags.
+What was <v9:RateReplyDetails> is now <RateReplyDetails> 
+
+______________________________________
 0.97 Mon April 02 2012
 
 * Added timestamp to the xlm request.
